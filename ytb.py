@@ -7,7 +7,6 @@ from urllib.parse import urlparse,parse_qs,unquote
 url = sys.argv[1]
 decode_url = urlparse(url)
 vid = parse_qs(decode_url.query).get('v')[0]
-print("\n" + vid)
 mimetypes.init()
 info_url = "http://www.youtube.com/get_video_info?video_id={}".format(vid)
 info_resp = r.get(info_url)
@@ -35,17 +34,21 @@ if not formats:
 max_f = {}    
 for f in formats:
     info = r.head(f.get('url'))
+    content_length = info.headers.get('content-length') 
     if not max_f:
         max_f = f
-        max_f['_length'] = info.headers.get('content-length')
+        max_f['_length'] = content_length
         continue
-    if int(max_f.get('_length')) < int(info.headers.get('content-length')):
+    if int(max_f.get('_length')) < int(content_length):
         max_f = f
+        max_f['_length'] = content_length
 videoDetails = json.get('videoDetails')
 if not videoDetails:
     print('video info got fail')
     exit(1)
 title = videoDetails.get('title')
+print("\nvid:" + vid)
+print("title:" + title)
 mime_type = max_f.get('mimeType')
 if not mime_type:
     print('video info got fail')
