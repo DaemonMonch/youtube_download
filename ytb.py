@@ -34,10 +34,12 @@ if not formats:
     exit(1)
 max_f = {}    
 for f in formats:
+    info = r.head(f.get('url'))
     if not max_f:
         max_f = f
+        max_f['_length'] = info.headers.get('content-length')
         continue
-    if int(max_f.get('contentLength')) < int(f.get('contentLength')):
+    if int(max_f.get('_length')) < int(info.headers.get('content-length')):
         max_f = f
 videoDetails = json.get('videoDetails')
 if not videoDetails:
