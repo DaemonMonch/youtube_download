@@ -35,14 +35,14 @@ def find_max_quality_url(urls):
                 max_f["url"] = url
                 max_f["size"] = size
                 max_f['mimetype'] = mime_type
-                max_f['rangeable'] = m['rangeable']
+                max_f['rangeable'] = info['rangeable']
                 continue
             
             if max_f.get("size") < size:
                 max_f["url"] = url
                 max_f["size"] = size
                 max_f['mimetype'] = mime_type
-                max_f['rangeable'] = m['rangeable']
+                max_f['rangeable'] = info['rangeable']
     return max_f                
 
 def get_filename(mime_type):
@@ -64,8 +64,9 @@ def get_filename(mime_type):
 
 def download(info):
     size = info.get('size')
+    url = info.get('url')
     thread_num = 1 if size < 10485760 else  4
-    partital_size =  size / thread_num
+    partital_size =  size // thread_num
     ranges = []
     if thread_num > 1 and info.get('rangeable'):
         for i in range(0,thread_num):
@@ -73,26 +74,31 @@ def download(info):
             e = (i + 1) * partital_size if i + 1 < 4 else size
             ranges.append("{}-{}".format(s,e))
     if len(ranges) == 0:
-        filenames = [vid]
+        file_info = [{'filename':vid}]
     else:
-        filenames = ["{}-{}".format(vid,range) for range in ranges]
-
+        file_info = []
+        for rn in ranges:
+            file_info.append({'filename':"{}-{}".format(vid,rn),'range':rn})
     lock = threading.Lock()
     sum = 0
-    def _download(url,filename):
-        res = r.get(url,stream=True,headers={'Range':"bytes={}".format(range)})
+    def _download(url,ra,filename):
+        headers = {'Range':"bytes={}".format(ra)} if ra else None
+        res = r.get(url,stream=True,headers=headers)
+        print(res)
         with open(filename, 'wb') as fd:
             for chunk in res.iter_content(chunk_size=65535):
-               with lock:
+                with lock:
                     sum += 65535
                 fd.write(chunk)
                 sys.stdout.write('\r {:.2f}%'.format(sum * 100 / cl))
                 sys.stdout.flush()
             fd.flush()
+        return 0    
+    fs = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=thread_num) as executor:
-        futures = [executor.submit(_download,url,filename) for filename in filenames]
-        concurrent.futures.wait(future_to_url)
-    return filenames
+        fs = [executor.submit(_download,url,fi.get('range'),fi.get('filename')) for fi in file_info]
+    print(concurrent.futures.wait(fs))
+    return map(lambda f:f.get("filename"),file_info)
 
 
 def main():
@@ -114,7 +120,12 @@ def main():
     videoname = get_filename(max_f.get('mimetype'))
     print(max_f)
     print(videoname)
+    if not max_f:
+        print("get video info fail")
+        exit(-1)
+
     filenames = download(max_f)
+    print(filenames)
     with open(videoname,"wb") as out:
         for filename in filenames:
             with open(filename,"rb") as fin:
