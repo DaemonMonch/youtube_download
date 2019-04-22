@@ -127,6 +127,7 @@ def main():
     print(filenames)
     with open(videoname,"wb") as out:
         for filename in filenames:
+            print(filename)
             with open(filename,"rb") as fin:
                 content = memoryview(fin.read())
                 out.write(content)
