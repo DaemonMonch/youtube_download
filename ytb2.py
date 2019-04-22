@@ -5,10 +5,12 @@ import json,time,random,mimetypes,sys
 from urllib.parse import urlparse,parse_qs,unquote
 
 def get_video_size(url):
+    m = {}
     info = r.head(url)
     content_length = info.headers.get('content-length') 
-    print(info.headers.get('content-type'))
-    return int(content_length)
+    m['size'] = int(content_length)
+    m['mimetype'] = info.headers.get('content-type')
+    return m
 
 def find_max_quality_url(urls):
     max_f = {}
@@ -17,23 +19,30 @@ def find_max_quality_url(urls):
         future_to_url = {executor.submit(get_video_size,url):url for url in urls}
         for future in concurrent.futures.as_completed(future_to_url):
             url = future_to_url[future]
-            size = -1
+            info = {}
             try:
-                size = future.result()
+                info = future.result()
             except Exception as e:
                 print("get exception while get size on url {},{}".format(url,e))
-
+            if not  info:
+                continue
+            mime_type = mimetypes.guess_extension(info.get("mimetype"))  
+            if not mime_type in ['.mp4','.webm']:
+                continue
+            size = info.get('size')
             if not max_f:
                 max_f["url"] = url
                 max_f["size"] = size
+                max_f['mimetype'] = mime_type
                 continue
             
             if max_f.get("size") < size:
                 max_f["url"] = url
                 max_f["size"] = size
+                max_f['mimetype'] = mime_type
     return max_f                
 
-def get_filename():
+def get_filename(mime_type):
     player_response = content.get("player_response")  
     if not player_response or len(player_response) == 0:
         print('video info got fail')
@@ -46,15 +55,8 @@ def get_filename():
     title = videoDetails.get('title')
     print("\nvid:" + vid)
     print("title:" + title)
-    mime_type = max_f.get('mimeType')
-    if not mime_type:
-        print('video info got fail')
-        exit(1)
-    type_index = mime_type.index(';')
-    if type_index > -1:
-        mime_type = mime_type[0 : type_index + 1]
-    ext = mimetypes.guess_extension(mime_type) or '.mp4'
-    filename = '{}{}'.format(title or vid,ext)
+    
+    filename = '{}{}'.format(title or vid,mime_type)
     return filename
 
 
@@ -74,10 +76,12 @@ def main():
         exit(-1)
     #filename = get_filename()  
     video_urls = parse_qs(adaptive_fmts_encoded[0]).get("url")
-    for video_url in map(unquote,video_urls):
-        print(video_url)  
+    # for video_url in map(unquote,video_urls):
+        # print(video_url)  
     max_f = find_max_quality_url(video_urls)
+    filename = get_filename(max_f.get('mimetype'))
     print(max_f)
+    print(filename)
 
 if __name__ == "__main__":
     main()
