@@ -2,11 +2,8 @@
 import requests as r
 import concurrent.futures
 import json,time,random,mimetypes,sys,threading
+import sum
 from urllib.parse import urlparse,parse_qs,unquote
-
-lock = threading.Lock()
-sum = 0
-
 
 def get_video_size(url):
     m = {}
