@@ -72,11 +72,11 @@ def _download(url,ra,filename):
     print(res)
     with open(filename, 'wb') as fd:
         for chunk in res.iter_content(chunk_size=65535):
-            with lock:
-                sum += 65535
+        #    with lock:
+        #        sum += 65535
             fd.write(chunk)
-            sys.stdout.write('\r {:.2f}%'.format(sum * 100 / cl))
-            sys.stdout.flush()
+        #    sys.stdout.write('\r {:.2f}%'.format(sum * 100 / cl))
+        #    sys.stdout.flush()
         fd.flush()
 
 def download(info):
