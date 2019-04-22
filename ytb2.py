@@ -4,6 +4,10 @@ import concurrent.futures
 import json,time,random,mimetypes,sys,threading
 from urllib.parse import urlparse,parse_qs,unquote
 
+lock = threading.Lock()
+sum = 0
+
+
 def get_video_size(url):
     m = {}
     info = r.head(url)
@@ -62,6 +66,19 @@ def get_filename(mime_type):
     filename = '{}{}'.format(title or vid,mime_type)
     return filename
 
+def _download(url,ra,filename):
+    headers = {'Range':"bytes={}".format(ra)} if ra else None
+    res = r.get(url,stream=True,headers=headers)
+    print(res)
+    with open(filename, 'wb') as fd:
+        for chunk in res.iter_content(chunk_size=65535):
+            with lock:
+                sum += 65535
+            fd.write(chunk)
+            sys.stdout.write('\r {:.2f}%'.format(sum * 100 / cl))
+            sys.stdout.flush()
+        fd.flush()
+
 def download(info):
     size = info.get('size')
     url = info.get('url')
@@ -79,21 +96,6 @@ def download(info):
         file_info = []
         for rn in ranges:
             file_info.append({'filename':"{}-{}".format(vid,rn),'range':rn})
-    lock = threading.Lock()
-    sum = 0
-    def _download(url,ra,filename):
-        headers = {'Range':"bytes={}".format(ra)} if ra else None
-        res = r.get(url,stream=True,headers=headers)
-        print(res)
-        with open(filename, 'wb') as fd:
-            for chunk in res.iter_content(chunk_size=65535):
-                with lock:
-                    sum += 65535
-                fd.write(chunk)
-                sys.stdout.write('\r {:.2f}%'.format(sum * 100 / cl))
-                sys.stdout.flush()
-            fd.flush()
-        return 0    
     fs = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=thread_num) as executor:
         fs = [executor.submit(_download,url,fi.get('range'),fi.get('filename')) for fi in file_info]
