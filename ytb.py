@@ -11,6 +11,7 @@ mimetypes.init()
 info_url = "http://www.youtube.com/get_video_info?video_id={}".format(vid)
 info_resp = r.get(info_url)
 content = info_resp.text
+print(content)        
 player_response_index = content.index("player_response=")
 if player_response_index < 0:
     print("no")
