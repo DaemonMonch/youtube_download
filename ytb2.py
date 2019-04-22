@@ -7,27 +7,30 @@ from urllib.parse import urlparse,parse_qs,unquote
 def get_video_size(url):
     info = r.head(url)
     content_length = info.headers.get('content-length') 
-    return content_length
+    print(info.headers.get('content-type'))
+    return int(content_length)
 
 def find_max_quality_url(urls):
     max_f = {}
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        future_to_url = {executor.submit(get_video_size,url,90):url for url in urls}
-        for future in futures.as_completed(future_to_url):
-            url = future_to_url(future)
+        future_to_url = {executor.submit(get_video_size,url):url for url in urls}
+        for future in concurrent.futures.as_completed(future_to_url):
+            url = future_to_url[future]
             size = -1
             try:
                 size = future.result()
             except Exception as e:
                 print("get exception while get size on url {},{}".format(url,e))
 
-            max_f["url"] = url
             if not max_f:
+                max_f["url"] = url
                 max_f["size"] = size
-            else:
-                if max_f.get("size") < size:
-                    max_f["size"] = size
+                continue
+            
+            if max_f.get("size") < size:
+                max_f["url"] = url
+                max_f["size"] = size
     return max_f                
 
 def get_filename():
@@ -35,8 +38,8 @@ def get_filename():
     if not player_response or len(player_response) == 0:
         print('video info got fail')
         exit(1)
-    json = json.loads(unquote(player_response[0]))
-    videoDetails = json.get('videoDetails')
+    json_obj = json.loads(unquote(player_response[0]))
+    videoDetails = json_obj.get('videoDetails')
     if not videoDetails:
         print('video info got fail')
         exit(1)
@@ -57,6 +60,7 @@ def get_filename():
 
 def main():
     global content 
+    global vid
     url = sys.argv[1]
     decode_url = urlparse(url)
     vid = parse_qs(decode_url.query).get('v')[0]
@@ -68,9 +72,8 @@ def main():
     if not adaptive_fmts_encoded or len(adaptive_fmts_encoded) == 0:
         print("get video info fail")
         exit(-1)
-    filename = get_filename()  
-    adaptive_fmts = unquote(adaptive_fmts_encoded[0])
-    video_urls = parse_qs(adaptive_fmts).get("url")
+    #filename = get_filename()  
+    video_urls = parse_qs(adaptive_fmts_encoded[0]).get("url")
     for video_url in map(unquote,video_urls):
         print(video_url)  
     max_f = find_max_quality_url(video_urls)
