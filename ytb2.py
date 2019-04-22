@@ -29,7 +29,7 @@ def find_max_quality_url(urls):
             if not  info:
                 continue
             mime_type = mimetypes.guess_extension(info.get("mimetype"))  
-            if not mime_type in ['.mp4','.webm']:
+            if not mime_type in ['.mp4']:
                 continue
             size = info.get('size')
             if not max_f:
@@ -64,27 +64,28 @@ def get_filename(mime_type):
     return filename
 
 def _download(url,s,ra,filename):
+    import sys
     headers = {'Range':"bytes={}".format(ra)} if ra else None
     res = r.get(url,stream=True,headers=headers)
     print(res)
     with open(filename, 'wb') as fd:
         for chunk in res.iter_content(chunk_size=65535):
-                s.incr(65535)
+            s.incr(65535)
             fd.write(chunk)
-            sys.stdout.write('\r {:.2f}%'.format(s.get() * 100 / cl))
+            sys.stdout.write('\r {:.2f}%'.format(s.get_ratio()))
             sys.stdout.flush()
         fd.flush()
 
 def download(info):
     size = info.get('size')
     url = info.get('url')
-    thread_num = 1 if size < 10485760 else  4
+    thread_num = 1 if size < 10485760 else  8
     partital_size =  size // thread_num
     ranges = []
     if thread_num > 1 and info.get('rangeable'):
         for i in range(0,thread_num):
-            s = i * partital_size
-            e = (i + 1) * partital_size if i + 1 < 4 else size
+            s = i * partital_size + (1 if i > 0 else 0)
+            e = (i + 1) * partital_size if i + 1 < thread_num else size
             ranges.append("{}-{}".format(s,e))
     if len(ranges) == 0:
         file_info = [{'filename':vid}]
@@ -93,7 +94,7 @@ def download(info):
         for rn in ranges:
             file_info.append({'filename':"{}-{}".format(vid,rn),'range':rn})
     fs = []
-    s = sum.Sum()
+    s = sum.Sum(size)
     with concurrent.futures.ThreadPoolExecutor(max_workers=thread_num) as executor:
         fs = [executor.submit(_download,url,s,fi.get('range'),fi.get('filename')) for fi in file_info]
     print(concurrent.futures.wait(fs))
@@ -129,8 +130,11 @@ def main():
         for filename in filenames:
             print(filename)
             with open(filename,"rb") as fin:
-                content = memoryview(fin.read())
-                out.write(content)
+                while True:
+                    content = fin.read(65535)
+                    if not content:
+                        break
+                    out.write(content)
             out.flush()
     print("done!")                
 
